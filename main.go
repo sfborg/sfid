@@ -21,8 +21,16 @@ THE SOFTWARE.
 */
 package main
 
-import "github.com/sfborg/sfid/cmd"
+import (
+	"log/slog"
+	"os"
+
+	"github.com/lmittmann/tint"
+	"github.com/sfborg/sfid/cmd"
+)
 
 func main() {
+	handle := slog.New(tint.NewHandler(os.Stderr, nil))
+	slog.SetDefault(handle)
 	cmd.Execute()
 }

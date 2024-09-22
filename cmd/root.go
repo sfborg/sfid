@@ -22,7 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
+	"log/slog"
 	"os"
 
 	sfid "github.com/sfborg/sfid/pkg"
@@ -59,9 +59,12 @@ to quickly create a Cobra application.`,
 		}
 		sf := sfid.New(cfg)
 
-		out := sf.Process(args[0])
-
-		fmt.Print(outputToCSV(out))
+		out, err := sf.Process(args[0])
+		if err != nil {
+			slog.Error("Cannot process", "input", args[0], "error", err)
+			os.Exit(1)
+		}
+		_ = out
 	},
 }
 
