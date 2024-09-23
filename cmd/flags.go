@@ -30,3 +30,38 @@ func jobsNumFlag(cmd *cobra.Command) {
 		opts = append(opts, config.OptJobsNum(i))
 	}
 }
+
+func uuidFlag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("uuid")
+	if b {
+		opts = append(opts, config.OptWithUUID(b))
+	}
+}
+
+func shaFlag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("sha256")
+	if b {
+		opts = append(opts, config.OptWithSha(b))
+	}
+}
+
+func recursiveFlag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("recursive")
+	if b {
+		opts = append(opts, config.OptRecursive(b))
+	}
+}
+
+func gnFlag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("gn_namespace")
+	if b {
+		opts = append(opts, config.OptNameSpace("globalnames.org"))
+	}
+}
+
+func twFlag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("tw_namespace")
+	if b {
+		opts = append(opts, config.OptNameSpace("taxonworks.org"))
+	}
+}

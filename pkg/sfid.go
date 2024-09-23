@@ -6,10 +6,13 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 
+	"github.com/gnames/gnsys"
 	"github.com/google/uuid"
 	"github.com/sfborg/sfid/ent"
 	"github.com/sfborg/sfid/pkg/config"
@@ -32,28 +35,58 @@ func New(cfg config.Config) SFID {
 	return &res
 }
 
-func (s *sfid) Process(inp string) ([]ent.Output, error) {
-	return s.fromDir(inp)
+func (s *sfid) Process(inp string, chOut chan<- *ent.Output) error {
+	defer close(chOut)
+	var err error
+
+	dirSt := gnsys.GetDirState(inp)
+	if dirSt == gnsys.DirEmpty {
+		slog.Warn("Empty directory", "dir", "inp")
+		return fmt.Errorf("empty directory: '%s'", inp)
+	}
+	if dirSt == gnsys.DirNotEmpty {
+		err = s.fromDir(inp, chOut)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	isFile, _ := gnsys.FileExists(inp)
+	if isFile {
+		out, err := s.fromFile(inp)
+		if err != nil {
+			return err
+		}
+		chOut <- out
+		return nil
+	}
+
+	chOut <- s.fromString(inp)
+	return nil
 }
 
 func (s *sfid) fromString(str string) *ent.Output {
-	res := ent.Output{Input: str}
+	res := ent.Output{Type: "STRING", Input: str}
 
-	if s.cfg.OutputUUID {
-		res.UUID = uuid.NewSHA1(s.ns, []byte(str))
+	if s.cfg.WithUUID {
+		uuidObj := uuid.NewSHA1(s.ns, []byte(str))
+		res.UUID = &uuidObj
 	}
 
-	if s.cfg.OutputSha256 {
+	if s.cfg.WithSha {
 		h := sha256.New()
 		h.Write([]byte(str))
-		res.Sha = string(h.Sum(nil))
+		res.Sha = h.Sum(nil)
 	}
+
+	fmt.Print(res.String())
 
 	return &res
 }
 
 func (s *sfid) fromFile(path string) (*ent.Output, error) {
-	res := ent.Output{Input: path}
+	res := ent.Output{Type: "FILE", Input: path}
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -61,7 +94,7 @@ func (s *sfid) fromFile(path string) (*ent.Output, error) {
 	}
 	defer f.Close()
 
-	if s.cfg.OutputUUID {
+	if s.cfg.WithUUID {
 		h := sha1.New()
 		const bufferSize = 65536
 		buffer := make([]byte, bufferSize)
@@ -75,11 +108,14 @@ func (s *sfid) fromFile(path string) (*ent.Output, error) {
 			}
 			h.Write(buffer[:bsNum])
 		}
-		res.UUID = uuid.NewSHA1(s.ns, h.Sum(nil))
-		res.Sha = string(h.Sum(nil))
+		uuidObj := uuid.NewSHA1(s.ns, h.Sum(nil))
+		res.UUID = &uuidObj
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			return nil, err
+		}
 	}
 
-	if s.cfg.OutputSha256 {
+	if s.cfg.WithSha {
 		h := sha256.New()
 		const bufferSize = 65536
 		buffer := make([]byte, bufferSize)
@@ -93,31 +129,24 @@ func (s *sfid) fromFile(path string) (*ent.Output, error) {
 			}
 			h.Write(buffer[:bsNum])
 		}
-		res.Sha = string(h.Sum(nil))
+		res.Sha = h.Sum(nil)
 	}
 
 	return &res, nil
 }
 
-func (s *sfid) fromDir(path string) ([]ent.Output, error) {
+func (s *sfid) fromDir(path string, chOut chan<- *ent.Output) error {
 	var err error
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	g, ctx := errgroup.WithContext(ctx)
 	chIn := make(chan string)
-	chOut := make(chan *ent.Output)
+	var wg sync.WaitGroup
+	wg.Add(s.cfg.JobsNum)
 
 	g.Go(func() error {
-		for o := range chOut {
-			fmt.Printf("%s\t%s\t%s", o.Input, o.UUID.String(), o.Sha)
-		}
-		return nil
-	})
-
-	g.Go(func() error {
-		defer close(chOut)
 		for range s.cfg.JobsNum {
-			err := s.dirWorker(ctx, chIn, chOut)
+			err := s.dirWorker(ctx, chIn, chOut, &wg)
 			if err != nil {
 				slog.Error("dirWorker", "error", err)
 				return err
@@ -133,26 +162,34 @@ func (s *sfid) fromDir(path string) ([]ent.Output, error) {
 		}
 		return err
 	})
-	return nil, nil
+	wg.Wait()
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *sfid) dirWorker(
 	ctx context.Context,
 	chIn <-chan string,
 	chOut chan<- *ent.Output,
+	wg *sync.WaitGroup,
 ) error {
+	defer wg.Done()
 	for path := range chIn {
+		fmt.Println(path)
 		out, err := s.fromFile(path)
 		if err != nil {
 			return err
 		}
+		chOut <- out
 		select {
 		case <-ctx.Done():
 			for range chIn {
 			}
 			return ctx.Err()
 		default:
-			chOut <- out
 		}
 	}
 	return nil
@@ -163,6 +200,14 @@ func (s *sfid) loadFiles(
 	path string,
 	chIn chan<- string,
 ) error {
+	if !s.cfg.Recursive {
+		err := s.readDir(ctx, path, chIn)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
 	root := path
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -185,6 +230,37 @@ func (s *sfid) loadFiles(
 	if err != nil {
 		fmt.Println("Error walking the path:", err)
 		return err
+	}
+	close(chIn)
+	return nil
+}
+
+func (s *sfid) readDir(
+	ctx context.Context,
+	path string,
+	chIn chan<- string,
+) error {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		if !file.Type().IsRegular() {
+			continue
+		}
+
+		chIn <- filepath.Join(path, file.Name())
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 	}
 	close(chIn)
 	return nil

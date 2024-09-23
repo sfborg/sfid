@@ -8,12 +8,12 @@ type Config struct {
 	// NameSpace of UUID v5, not used if only Sha256 output is requested.
 	NameSpace string
 
-	//OutputSha256 returns Sha256 hash back
-	OutputSha256 bool
+	//WithSha returns Sha256 hash back
+	WithSha bool
 
-	// OutputUUID returns UUIDv5 back using either supplied or default UUID
+	// WithUUID returns UUIDv5 back using either supplied or default UUID
 	// NameSpace.
-	OutputUUID bool
+	WithUUID bool
 
 	// Input is a string that might mean either a string, a file or a directory.
 	Input string
@@ -40,6 +40,17 @@ func OptInput(s string) Option {
 	}
 }
 
+func OptWithUUID(b bool) Option {
+	return func(c *Config) {
+		c.WithUUID = b
+	}
+}
+
+func OptWithSha(b bool) Option {
+	return func(c *Config) {
+		c.WithSha = b
+	}
+}
 func OptRecursive(b bool) Option {
 	return func(c *Config) {
 		c.Recursive = b
