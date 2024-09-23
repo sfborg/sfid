@@ -10,8 +10,9 @@ FLAGS_LD = -ldflags "-X github.com/sfborg/$(PROJ_NAME)/pkg.Build=${DATE} \
 FLAGS_REL = -trimpath -ldflags "-s -w -X github.com/sfborg/$(PROJ_NAME)/pkg.Build=$(DATE)"
 FLAGS_SHARED = $(NO_C) GOARCH=amd64
 FLAGS_LINUX = $(FLAGS_SHARED) GOOS=linux
+FLAGS_LINUX_ARM = $(NO_C) $GOARCH=arm64 GOOS=linux
 FLAGS_MAC = $(FLAGS_SHARED) GOOS=darwin
-FLAGS_MAC_ARM = $GOARCH=arm64 GOOS=darwin
+FLAGS_MAC_ARM = $(NO_C) $GOARCH=arm64 GOOS=darwin
 FLAGS_WIN = $(FLAGS_SHARED) GOOS=windows
 
 RELEASE_DIR = /tmp
@@ -65,6 +66,9 @@ release: buildrel ## Build and package binaries for a release
 	$(GOCLEAN); \
 	$(FLAGS_LINUX) $(GORELEASE); \
 	tar zcvf $(RELEASE_DIR)/$(PROJ_NAME)-$(VER)-linux.tar.gz $(PROJ_NAME); \
+	$(GOCLEAN); \
+	$(FLAGS_LINUX_ARM) $(GORELEASE); \
+	tar zcvf $(RELEASE_DIR)/$(PROJ_NAME)-$(VER)-linux-arm.tar.gz $(PROJ_NAME); \
 	$(GOCLEAN); \
 	$(FLAGS_MAC) $(GORELEASE); \
 	tar zcvf /tmp/$(PROJ_NAME)-$(VER)-mac.tar.gz $(PROJ_NAME); \
