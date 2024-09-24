@@ -4,7 +4,7 @@ import "github.com/gnames/gnlib/ent/gnvers"
 
 var (
 	// Version provides the current version of `sfid`.
-	Version = "v0.1.0"
+	Version = "v0.1.1"
 
 	// Build provides a timestamp when `sfid` was compiled.
 	Build = "N/A"

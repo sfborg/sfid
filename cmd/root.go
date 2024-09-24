@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/sfborg/sfid/ent"
 	sfid "github.com/sfborg/sfid/pkg"
@@ -41,7 +42,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		versionFlag(cmd)
 		flags := []flagFunc{
-			jobsNumFlag, shaFlag, uuidFlag, recursiveFlag, gnFlag, twFlag,
+			jobsNumFlag, md5Flag, uuidFlag, recursiveFlag, gnFlag, twFlag,
 		}
 		for _, v := range flags {
 			v(cmd)
@@ -55,8 +56,11 @@ var rootCmd = &cobra.Command{
 		}
 		sf := sfid.New(cfg)
 		chOut := make(chan *ent.Output)
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		go func() {
+			defer wg.Done()
 			for o := range chOut {
 				fmt.Println(o.String())
 			}
@@ -67,6 +71,8 @@ var rootCmd = &cobra.Command{
 			slog.Error("Cannot process", "input", args[0], "error", err)
 			os.Exit(1)
 		}
+		close(chOut)
+		wg.Wait()
 	},
 }
 
@@ -85,7 +91,7 @@ func init() {
 	rootCmd.Flags().IntP("jobs_number", "j", 0, "jobs number")
 	rootCmd.Flags().BoolP("version", "V", false, "show version of the app")
 	rootCmd.Flags().BoolP("uuid", "u", false, "include UUID v5")
-	rootCmd.Flags().BoolP("sha256", "s", false, "include SHA256 hash")
+	rootCmd.Flags().BoolP("md5", "m", false, "include MD5 hash")
 	rootCmd.Flags().BoolP("recursive", "r", false, "traverse a directory recursively")
 
 }

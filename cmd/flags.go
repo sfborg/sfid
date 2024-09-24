@@ -38,10 +38,10 @@ func uuidFlag(cmd *cobra.Command) {
 	}
 }
 
-func shaFlag(cmd *cobra.Command) {
-	b, _ := cmd.Flags().GetBool("sha256")
+func md5Flag(cmd *cobra.Command) {
+	b, _ := cmd.Flags().GetBool("md5")
 	if b {
-		opts = append(opts, config.OptWithSha(b))
+		opts = append(opts, config.OptWithMD5(b))
 	}
 }
 

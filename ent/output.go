@@ -10,7 +10,7 @@ import (
 type Output struct {
 	Type  string
 	Input string
-	Sha   []byte
+	MD5   []byte
 	UUID  *uuid.UUID
 }
 
@@ -19,14 +19,14 @@ func (o Output) String() string {
 	if o.UUID != nil {
 		u = o.UUID.String()
 	}
-	var sha string
-	if len(o.Sha) > 0 {
-		sha = hex.EncodeToString(o.Sha)
+	var md5 string
+	if len(o.MD5) > 0 {
+		md5 = hex.EncodeToString(o.MD5)
 	}
 	inp := o.Input
 	if o.Type == "STRING" && len(inp) > 100 {
 		inp = o.Input[0:100] + "..."
 	}
-	res := strings.Join([]string{o.Type, inp, u, sha}, "\t")
+	res := strings.Join([]string{inp, md5, u}, "\t")
 	return res
 }

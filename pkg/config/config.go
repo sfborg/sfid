@@ -8,8 +8,8 @@ type Config struct {
 	// NameSpace of UUID v5, not used if only Sha256 output is requested.
 	NameSpace string
 
-	//WithSha returns Sha256 hash back
-	WithSha bool
+	//WithMD5 returns MD5 hash back
+	WithMD5 bool
 
 	// WithUUID returns UUIDv5 back using either supplied or default UUID
 	// NameSpace.
@@ -46,9 +46,9 @@ func OptWithUUID(b bool) Option {
 	}
 }
 
-func OptWithSha(b bool) Option {
+func OptWithMD5(b bool) Option {
 	return func(c *Config) {
-		c.WithSha = b
+		c.WithMD5 = b
 	}
 }
 func OptRecursive(b bool) Option {

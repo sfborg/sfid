@@ -2,8 +2,8 @@ package sfid
 
 import (
 	"context"
+	"crypto/md5"
 	"crypto/sha1"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
@@ -36,23 +36,22 @@ func New(cfg config.Config) SFID {
 }
 
 func (s *sfid) Process(inp string, chOut chan<- *ent.Output) error {
-	defer close(chOut)
 	var err error
 
 	dirSt := gnsys.GetDirState(inp)
 	if dirSt == gnsys.DirEmpty {
-		slog.Warn("Empty directory", "dir", "inp")
+		slog.Warn("Empty directory", "dir", inp)
 		return fmt.Errorf("empty directory: '%s'", inp)
 	}
 	if s.cfg.WithUUID {
 		slog.Info("Generating UUID v5", "namespace", s.cfg.NameSpace)
 	}
-	if s.cfg.WithSha {
-		slog.Info("Generating Sha256 hash")
+	if s.cfg.WithMD5 {
+		slog.Info("Generating MD5 hash")
 	}
 	if dirSt == gnsys.DirNotEmpty {
 		slog.Info("Traversing directory",
-			"recursive", s.cfg.Recursive, "jobs", s.cfg.JobsNum,
+			"dir", inp, "recursive", s.cfg.Recursive, "jobs", s.cfg.JobsNum,
 		)
 		err = s.fromDir(inp, chOut)
 		if err != nil {
@@ -85,10 +84,10 @@ func (s *sfid) fromString(str string) *ent.Output {
 		res.UUID = &uuidObj
 	}
 
-	if s.cfg.WithSha {
-		h := sha256.New()
+	if s.cfg.WithMD5 {
+		h := md5.New()
 		h.Write([]byte(str))
-		res.Sha = h.Sum(nil)
+		res.MD5 = h.Sum(nil)
 	}
 
 	return &res
@@ -124,8 +123,8 @@ func (s *sfid) fromFile(path string) (*ent.Output, error) {
 		}
 	}
 
-	if s.cfg.WithSha {
-		h := sha256.New()
+	if s.cfg.WithMD5 {
+		h := md5.New()
 		const bufferSize = 65536
 		buffer := make([]byte, bufferSize)
 		for {
@@ -138,7 +137,7 @@ func (s *sfid) fromFile(path string) (*ent.Output, error) {
 			}
 			h.Write(buffer[:bsNum])
 		}
-		res.Sha = h.Sum(nil)
+		res.MD5 = h.Sum(nil)
 	}
 
 	return &res, nil
